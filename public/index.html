@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Brain</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 12px; }
+
+    .brain-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f9fafb;
+      letter-spacing: -0.3px;
+    }
+
+    .header-controls { display: flex; gap: 10px; align-items: center; }
+
+    select {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #f0f0f0;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .upload-btn {
+      background: #1d4ed8;
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .upload-btn:hover { background: #2563eb; }
+
+    /* ── CHAT AREA ── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .message.user {
+      background: #1d4ed8;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.brain {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #e5e7eb;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+      white-space: pre-wrap;
+    }
+
+    .message.system {
+      background: transparent;
+      color: #6b7280;
+      font-size: 12px;
+      align-self: center;
+      text-align: center;
+      border: none;
+      padding: 4px;
+    }
+
+    .thinking {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #6b7280;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    /* ── INPUT AREA ── */
+    .input-area {
+      background: #1a1a1a;
+      border-top: 1px solid #2a2a2a;
+      padding: 16px 24px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-area textarea {
+      flex: 1;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #f0f0f0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      height: 44px;
+      line-height: 1.5;
+      outline: none;
+    }
+
+    .input-area textarea:focus { border-color: #1d4ed8; }
+
+    .send-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .send-btn:hover { background: #059669; }
+    .send-btn:disabled { background: #374151; cursor: not-allowed; }
+
+    /* ── UPLOAD PANEL ── */
+    .upload-panel {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .upload-panel.open { display: flex; }
+
+    .upload-box {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 28px;
+      width: 480px;
+      max-width: 90vw;
+    }
+
+    .upload-box h2 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #f9fafb;
+    }
+
+    .upload-box p {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 20px;
+    }
+
+    .drop-zone {
+      border: 2px dashed #3a3a3a;
+      border-radius: 10px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      margin-bottom: 16px;
+    }
+
+    .drop-zone:hover { border-color: #1d4ed8; }
+    .drop-zone p { color: #6b7280; font-size: 14px; margin: 0; }
+    .drop-zone input { color: #9ca3af; font-size: 13px; margin-top: 10px; }
+
+    .doc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .doc-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0f0f0f;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .doc-item span { color: #9ca3af; }
+
+    .doc-delete {
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .upload-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    .btn-close {
+      background: #2a2a2a;
+      color: #9ca3af;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .gaps-badge {
+      background: #ef4444;
+      color: white;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="brain-dot"></div>
+    <h1>Restaurant Brain</h1>
+  </div>
+  <div class="header-controls">
+    <select id="roleSelect">
+      <option value="crew">Crew</option>
+      <option value="manager">Manager</option>
+      <option value="catering_manager">Catering Manager</option>
+      <option value="owner">Owner</option>
+    </select>
+    <select id="langSelect">
+      <option value="english">English</option>
+      <option value="spanish">Español</option>
+    </select>
+    <button class="upload-btn" onclick="openUpload()">📄 Documents</button>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="chat-area" id="chatArea">
+  <div class="message system">Restaurant Brain is ready. Ask anything about your restaurant.</div>
+</div>
+
+<!-- INPUT -->
+<div class="input-area">
+  <textarea id="questionInput" placeholder="Ask anything — recipes, refunds, catering pricing, equipment..." onkeydown="handleKey(event)"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="ask()">Ask</button>
+</div>
+
+<!-- UPLOAD PANEL -->
+<div class="upload-panel" id="uploadPanel">
+  <div class="upload-box">
+    <h2>📄 Knowledge Base</h2>
+    <p>Upload your restaurant documents — recipes, SOPs, policies, pricing, equipment manuals. Supports PDF, Word, Excel, and text files.</p>
+
+    <div class="drop-zone">
+      <p>Select a document to upload</p>
+      <p style="font-size:11px;margin-top:6px;">PDF · Word · Excel · TXT</p>
+      <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onchange="uploadFile(this.files[0])">
+    </div>
+
+    <div class="doc-list" id="docList"></div>
+
+    <div class="upload-actions">
+      <button class="btn-close" onclick="closeUpload()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let docs = [];
+
+  // ── ASK ───────────────────────────────────────
+  async function ask() {
+    const input   = document.getElementById('questionInput');
+    const question = input.value.trim();
+    if (!question) return;
+
+    const role     = document.getElementById('roleSelect').value;
+    const language = document.getElementById('langSelect').value;
+
+    addMessage(question, 'user');
+    input.value = '';
+
+    const thinking = addMessage('Thinking...', 'thinking');
+    document.getElementById('sendBtn').disabled = true;
+
+    try {
+      const res  = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, role, language })
+      });
+      const data = await res.json();
+      thinking.remove();
+      addMessage(data.success ? data.answer : 'Error: ' + data.error, 'brain');
+    } catch(e) {
+      thinking.remove();
+      addMessage('Connection error. Try again.', 'brain');
+    }
+
+    document.getElementById('sendBtn').disabled = false;
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); }
+  }
+
+  function addMessage(text, type) {
+    const div = document.createElement('div');
+    div.className = `message ${type}`;
+    div.textContent = text;
+    const area = document.getElementById('chatArea');
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+    return div;
+  }
+
+  // ── UPLOAD ────────────────────────────────────
+  function openUpload() {
+    loadDocs();
+    document.getElementById('uploadPanel').classList.add('open');
+  }
+
+  function closeUpload() {
+    document.getElementById('uploadPanel').classList.remove('open');
+  }
+
+  async function loadDocs() {
+    const res  = await fetch('/api/knowledge');
+    const data = await res.json();
+    docs = data.documents;
+    renderDocs();
+  }
+
+  function renderDocs() {
+    const list = document.getElementById('docList');
+    if (!docs.length) {
+      list.innerHTML = '<div style="color:#6b7280;font-size:13px;text-align:center;padding:12px;">No documents uploaded yet</div>';
+      return;
+    }
+    list.innerHTML = docs.map(d => `
+      <div class="doc-item">
+        <div>
+          <div style="font-weight:600;color:#f0f0f0;">${d.filename}</div>
+          <span>${(d.chars/1000).toFixed(1)}k characters</span>
+        </div>
+        <button class="doc-delete" onclick="deleteDoc(${d.id})">×</button>
+      </div>
+    `).join('');
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    const status = addMessage(`Uploading ${file.name}...`, 'system');
+
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+      const res  = await fetch('/api/upload', { method: 'POST', body: form });
+      const data = await res.json();
+      status.remove();
+      if (data.success) {
+        addMessage(`✓ ${data.filename} added to knowledge base`, 'system');
+        loadDocs();
+      } else {
+        addMessage(`✗ Upload failed: ${data.error}`, 'system');
+      }
+    } catch(e) {
+      status.remove();
+      addMessage('Upload failed. Try again.', 'system');
+    }
+  }
+
+  async function deleteDoc(id) {
+    await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
+    loadDocs();
+  }
+</script>
+
+</body>
+</html>
