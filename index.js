@@ -13,9 +13,23 @@ const path       = require('path');
 const app    = express();
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
-const upload = multer({ dest: UPLOADS_DIR });
+const DATA_DIR    = '/data';
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+const KB_FILE     = path.join(DATA_DIR, 'knowledge.json');
+const LOG_FILE    = path.join(DATA_DIR, 'interactions.jsonl');
+
+for (const dir of [DATA_DIR, UPLOADS_DIR]) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOADS_DIR,
+    filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    }
+  })
+});
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -26,7 +40,6 @@ app.use(express.static('public'));
 let knowledgeBase = [];
 
 // Load any previously saved knowledge on startup
-const KB_FILE = path.join(__dirname, 'knowledge.json');
 if (fs.existsSync(KB_FILE)) {
   try {
     knowledgeBase = JSON.parse(fs.readFileSync(KB_FILE, 'utf8'));
@@ -40,6 +53,67 @@ function saveKnowledge() {
   fs.writeFileSync(KB_FILE, JSON.stringify(knowledgeBase, null, 2));
 }
 
+const EXTRACT_PROMPT =
+  'Extract all text content from this file. Return only the extracted text, preserving structure and formatting where possible. Do not add commentary or markdown wrappers.';
+
+const IMAGE_MEDIA_TYPES = {
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif':  'image/gif',
+  '.webp': 'image/webp'
+};
+
+async function extractTextWithClaude(filePath, originalname) {
+  const ext    = path.extname(originalname).toLowerCase();
+  const buffer = fs.readFileSync(filePath);
+  const base64 = buffer.toString('base64');
+
+  let userContent;
+
+  if (ext === '.pdf') {
+    userContent = [
+      {
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: base64 }
+      },
+      { type: 'text', text: EXTRACT_PROMPT }
+    ];
+  } else if (IMAGE_MEDIA_TYPES[ext]) {
+    userContent = [
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: IMAGE_MEDIA_TYPES[ext], data: base64 }
+      },
+      { type: 'text', text: EXTRACT_PROMPT }
+    ];
+  } else if (['.txt', '.csv', '.md', '.json'].includes(ext)) {
+    return buffer.toString('utf8').trim();
+  } else if (ext === '.docx' || ext === '.doc') {
+    const mammoth = require('mammoth');
+    const result  = await mammoth.extractRawText({ path: filePath });
+    return result.value.trim();
+  } else {
+    const asText = buffer.toString('utf8');
+    if (asText && !/\ufffd/.test(asText)) {
+      return asText.trim();
+    }
+    throw new Error(`Unsupported file type: ${ext || 'unknown'}`);
+  }
+
+  const message = await client.messages.create({
+    model:      'claude-sonnet-4-6',
+    max_tokens: 8192,
+    messages:   [{ role: 'user', content: userContent }]
+  });
+
+  return message.content
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+}
+
 // ── DOCUMENT UPLOAD ───────────────────────────
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) {
@@ -47,29 +121,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 
   try {
-    let text = '';
-    const ext = path.extname(req.file.originalname).toLowerCase();
-
-    if (ext === '.txt') {
-      text = fs.readFileSync(req.file.path, 'utf8');
-    } else if (ext === '.pdf') {
-      const pdfParse = require('pdf-parse');
-      const buffer   = fs.readFileSync(req.file.path);
-      const data     = await pdfParse(buffer);
-      text = data.text;
-    } else if (ext === '.docx' || ext === '.doc') {
-      const mammoth = require('mammoth');
-      const result  = await mammoth.extractRawText({ path: req.file.path });
-      text = result.value;
-    } else if (ext === '.csv' || ext === '.xlsx' || ext === '.xls') {
-      // For spreadsheets, read as text for now
-      text = fs.readFileSync(req.file.path, 'utf8');
-    } else {
-      text = fs.readFileSync(req.file.path, 'utf8');
-    }
-
-    // Clean up temp file
-    fs.unlinkSync(req.file.path);
+    const text = await extractTextWithClaude(req.file.path, req.file.originalname);
 
     if (!text.trim()) {
       return res.json({ success: false, error: 'Could not extract text from file' });
@@ -157,7 +209,6 @@ ${context}`;
     };
 
     // Append to log file
-    const LOG_FILE = path.join(__dirname, 'interactions.jsonl');
     fs.appendFileSync(LOG_FILE, JSON.stringify(log) + '\n');
 
     console.log(`[Brain] Q (${role}/${language}): ${question.slice(0, 60)}...`);
@@ -194,7 +245,6 @@ app.delete('/api/knowledge/:id', (req, res) => {
 // ── GAPS REPORT ───────────────────────────────
 // Shows questions the Brain couldn't answer
 app.get('/api/gaps', (req, res) => {
-  const LOG_FILE = path.join(__dirname, 'interactions.jsonl');
   if (!fs.existsSync(LOG_FILE)) return res.json({ gaps: [] });
 
   const lines = fs.readFileSync(LOG_FILE, 'utf8').trim().split('\n').filter(Boolean);
