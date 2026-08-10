@@ -289,6 +289,33 @@
       padding: 2px 7px;
       margin-left: 6px;
     }
+
+    .upload-status {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .upload-status.loading {
+      display: block;
+      background: #1e3a5f;
+      color: #93c5fd;
+    }
+
+    .upload-status.success {
+      display: block;
+      background: #064e3b;
+      color: #6ee7b7;
+    }
+
+    .upload-status.error {
+      display: block;
+      background: #450a0a;
+      color: #fca5a5;
+    }
   </style>
 </head>
 <body>
@@ -339,8 +366,8 @@
         id="fileInput"
         class="file-input"
         accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
-        onchange="uploadFile(this.files[0])"
       >
+      <div id="uploadStatus" class="upload-status"></div>
     </div>
 
     <div class="doc-list" id="docList"></div>
@@ -434,10 +461,18 @@
     `).join('');
   }
 
+  function setUploadStatus(text, type) {
+    const el = document.getElementById('uploadStatus');
+    el.textContent = text;
+    el.className = 'upload-status' + (type ? ' ' + type : '');
+  }
+
   async function uploadFile(file) {
     const input = document.getElementById('fileInput');
     if (!file) return;
-    const status = addMessage(`Uploading ${file.name}...`, 'system');
+
+    setUploadStatus(`Uploading ${file.name}...`, 'loading');
+    input.disabled = true;
 
     const form = new FormData();
     form.append('file', file);
@@ -445,20 +480,24 @@
     try {
       const res  = await fetch('/api/upload', { method: 'POST', body: form });
       const data = await res.json();
-      status.remove();
       if (data.success) {
-        addMessage(`✓ ${data.filename} added to knowledge base`, 'system');
-        loadDocs();
+        setUploadStatus(`✓ ${data.filename} uploaded`, 'success');
+        await loadDocs();
       } else {
-        addMessage(`✗ Upload failed: ${data.error}`, 'system');
+        setUploadStatus(`✗ Upload failed: ${data.error}`, 'error');
       }
-    } catch(e) {
-      status.remove();
-      addMessage('Upload failed. Try again.', 'system');
+    } catch (e) {
+      setUploadStatus('✗ Upload failed. Try again.', 'error');
     } finally {
+      input.disabled = false;
       input.value = '';
     }
   }
+
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) uploadFile(file);
+  });
 
   async function deleteDoc(id) {
     await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
