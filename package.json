@@ -4,7 +4,8 @@
   "description": "AI brain for restaurant operations",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "setup-hooks": "git config core.hooksPath .githooks && chmod +x .githooks/* .cursor/hooks/*"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",
