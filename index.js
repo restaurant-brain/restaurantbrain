@@ -190,7 +190,7 @@ RESTAURANT KNOWLEDGE BASE:
 ${context}`;
 
     const message = await client.messages.create({
-      model:      'claude-sonnet-5-20260630',
+      model:      'claude-sonnet-4-6',
       max_tokens: 1024,
       system:     systemPrompt,
       messages:   [{ role: 'user', content: question }]
