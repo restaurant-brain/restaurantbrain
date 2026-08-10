@@ -307,9 +307,23 @@
 
     .upload-status.success {
       display: block;
-      background: #064e3b;
-      color: #6ee7b7;
+      background: transparent;
+      padding: 0;
     }
+
+    .upload-done-btn {
+      width: 100%;
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .upload-done-btn:hover { background: #059669; }
 
     .upload-status.error {
       display: block;
@@ -435,6 +449,7 @@
 
   function closeUpload() {
     document.getElementById('uploadPanel').classList.remove('open');
+    setUploadStatus('', '');
   }
 
   async function loadDocs() {
@@ -467,6 +482,12 @@
     el.className = 'upload-status' + (type ? ' ' + type : '');
   }
 
+  function showUploadDone() {
+    const el = document.getElementById('uploadStatus');
+    el.className = 'upload-status success';
+    el.innerHTML = '<button type="button" class="upload-done-btn" onclick="closeUpload()">Done ✓ — Close</button>';
+  }
+
   async function uploadFile(file) {
     const input = document.getElementById('fileInput');
     if (!file) return;
@@ -481,8 +502,8 @@
       const res  = await fetch('/api/upload', { method: 'POST', body: form });
       const data = await res.json();
       if (data.success) {
-        setUploadStatus(`✓ ${data.filename} uploaded`, 'success');
         await loadDocs();
+        showUploadDone();
       } else {
         setUploadStatus(`✗ Upload failed: ${data.error}`, 'error');
       }
