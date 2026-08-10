@@ -207,14 +207,36 @@
       border-radius: 10px;
       padding: 32px;
       text-align: center;
-      cursor: pointer;
       transition: border-color 0.2s;
       margin-bottom: 16px;
     }
 
     .drop-zone:hover { border-color: #1d4ed8; }
     .drop-zone p { color: #6b7280; font-size: 14px; margin: 0; }
-    .drop-zone input { color: #9ca3af; font-size: 13px; margin-top: 10px; }
+
+    .file-input {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      color: #9ca3af;
+      font-size: 13px;
+    }
+
+    .file-input::file-selector-button {
+      background: #1d4ed8;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 12px;
+    }
+
+    .file-input::file-selector-button:hover {
+      background: #2563eb;
+    }
 
     .doc-list {
       display: flex;
@@ -312,7 +334,13 @@
     <div class="drop-zone">
       <p>Select a document to upload</p>
       <p style="font-size:11px;margin-top:6px;">PDF · Word · Excel · TXT</p>
-      <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onchange="uploadFile(this.files[0])">
+      <input
+        type="file"
+        id="fileInput"
+        class="file-input"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+        onchange="uploadFile(this.files[0])"
+      >
     </div>
 
     <div class="doc-list" id="docList"></div>
@@ -407,6 +435,7 @@
   }
 
   async function uploadFile(file) {
+    const input = document.getElementById('fileInput');
     if (!file) return;
     const status = addMessage(`Uploading ${file.name}...`, 'system');
 
@@ -426,6 +455,8 @@
     } catch(e) {
       status.remove();
       addMessage('Upload failed. Try again.', 'system');
+    } finally {
+      input.value = '';
     }
   }
 
